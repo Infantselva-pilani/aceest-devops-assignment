@@ -1,8 +1,13 @@
 """
 ACEest Fitness & Gym - Flask Web Application
-DevOps Assignment - CI/CD Pipeline Implementation
-Student Roll No: 2024TM93572
-Course: Introduction to DevOps (CSIZG514/SEZG514/SEUSZG514)
+
+I built this REST API as part of my DevOps assignment to demonstrate
+how a real-world gym management system can be containerized and deployed
+through an automated CI/CD pipeline.
+
+Author : Infant Selva
+BITS ID : 2024TM93572
+Course  : Introduction to DevOps (CSIZG514/SEZG514/SEUSZG514)
 """
 
 from flask import Flask, jsonify, request
@@ -100,7 +105,7 @@ def add_client():
         return jsonify({"error": f"Client '{name}' already exists"}), 409
 
 
-@app.route("/clients/<name>", methods=["GET"])
+@app.route("/clients/<n>", methods=["GET"])
 def get_client(name):
     conn = get_db()
     client = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
@@ -110,7 +115,7 @@ def get_client(name):
     return jsonify(dict(client)), 200
 
 
-@app.route("/clients/<name>", methods=["PUT"])
+@app.route("/clients/<n>", methods=["PUT"])
 def update_client(name):
     data = request.get_json()
     conn = get_db()
@@ -135,7 +140,7 @@ def update_client(name):
     return jsonify(dict(updated)), 200
 
 
-@app.route("/clients/<name>", methods=["DELETE"])
+@app.route("/clients/<n>", methods=["DELETE"])
 def delete_client(name):
     conn = get_db()
     client = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
