@@ -1,7 +1,14 @@
 """
 ACEest Fitness & Gym - Pytest Test Suite
-Tests for all Flask API endpoints
-Student Roll No: 2024TM93572
+
+I wrote these tests to validate every endpoint of my Flask API.
+Each test class maps to a specific feature of the application.
+Running these tests locally and inside Docker gave me confidence
+that the app behaves correctly before it reaches the CI/CD pipeline.
+
+Author : Infant Selva
+BITS ID : 2024TM93572
+Course  : Introduction to DevOps (CSIZG514/SEZG514/SEUSZG514)
 """
 
 import pytest
@@ -9,10 +16,8 @@ import json
 import os
 import sys
 
-# Ensure app is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Use a separate test database
 os.environ["DB_NAME"] = "test_aceest.db"
 
 from app import app, init_db
@@ -27,7 +32,6 @@ def client():
             init_db()
         yield c
 
-    # Cleanup test DB after all tests
     if os.path.exists("test_aceest.db"):
         os.remove("test_aceest.db")
 
@@ -107,7 +111,6 @@ class TestClients:
         client.post("/clients", json={"name": "ToDelete User"})
         response = client.delete("/clients/ToDelete User")
         assert response.status_code == 200
-        # Verify it's gone
         get_response = client.get("/clients/ToDelete User")
         assert get_response.status_code == 404
 

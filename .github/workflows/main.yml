@@ -2,9 +2,9 @@ name: ACEest Fitness CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "master", "devops-assignment-1" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
 
@@ -39,9 +39,7 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          # Stop on syntax errors or undefined names (E9, F63, F7, F82)
           flake8 app.py --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Warn on style issues but don't fail
           flake8 app.py --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
   # ─────────────────────────────────────────
@@ -98,13 +96,9 @@ jobs:
 
       - name: Test Docker Container
         run: |
-          # Start container
           docker run -d --name aceest-test -p 5000:5000 aceest-fitness:latest
-          # Wait for startup
           sleep 5
-          # Hit the health endpoint
           curl --fail http://localhost:5000/health || (docker logs aceest-test && exit 1)
-          # Stop container
           docker stop aceest-test
 
       - name: Run Pytest inside Docker

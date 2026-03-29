@@ -1,8 +1,13 @@
 """
 ACEest Fitness & Gym - Flask Web Application
-DevOps Assignment - CI/CD Pipeline Implementation
-Student Roll No: 2024TM93572
-Course: Introduction to DevOps (CSIZG514/SEZG514/SEUSZG514)
+
+I built this REST API as part of my DevOps assignment to demonstrate
+how a real-world gym management system can be containerized and deployed
+through an automated CI/CD pipeline.
+
+Author : Infant Selva
+BITS ID : 2024TM93572
+Course  : Introduction to DevOps (CSIZG514/SEZG514/SEUSZG514)
 """
 
 from flask import Flask, jsonify, request
@@ -89,10 +94,12 @@ def add_client():
     try:
         conn.execute(
             "INSERT INTO clients (name, age, weight, program, membership_status) VALUES (?, ?, ?, ?, ?)",
-            (name, data.get("age"), data.get("weight"), data.get("program"), data.get("membership_status", "Active"))
+            (name, data.get("age"), data.get("weight"),
+             data.get("program"), data.get("membership_status", "Active"))
         )
         conn.commit()
-        client = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
+        client = conn.execute(
+            "SELECT * FROM clients WHERE name=?", (name,)).fetchone()
         conn.close()
         return jsonify(dict(client)), 201
     except sqlite3.IntegrityError:
@@ -100,21 +107,23 @@ def add_client():
         return jsonify({"error": f"Client '{name}' already exists"}), 409
 
 
-@app.route("/clients/<name>", methods=["GET"])
+@app.route("/clients/<string:name>", methods=["GET"])
 def get_client(name):
     conn = get_db()
-    client = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
+    client = conn.execute(
+        "SELECT * FROM clients WHERE name=?", (name,)).fetchone()
     conn.close()
     if not client:
         return jsonify({"error": "Client not found"}), 404
     return jsonify(dict(client)), 200
 
 
-@app.route("/clients/<name>", methods=["PUT"])
+@app.route("/clients/<string:name>", methods=["PUT"])
 def update_client(name):
     data = request.get_json()
     conn = get_db()
-    client = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
+    client = conn.execute(
+        "SELECT * FROM clients WHERE name=?", (name,)).fetchone()
     if not client:
         conn.close()
         return jsonify({"error": "Client not found"}), 404
@@ -130,15 +139,17 @@ def update_client(name):
         )
     )
     conn.commit()
-    updated = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
+    updated = conn.execute(
+        "SELECT * FROM clients WHERE name=?", (name,)).fetchone()
     conn.close()
     return jsonify(dict(updated)), 200
 
 
-@app.route("/clients/<name>", methods=["DELETE"])
+@app.route("/clients/<string:name>", methods=["DELETE"])
 def delete_client(name):
     conn = get_db()
-    client = conn.execute("SELECT * FROM clients WHERE name=?", (name,)).fetchone()
+    client = conn.execute(
+        "SELECT * FROM clients WHERE name=?", (name,)).fetchone()
     if not client:
         conn.close()
         return jsonify({"error": "Client not found"}), 404
@@ -149,11 +160,12 @@ def delete_client(name):
 
 
 # ---------- WORKOUTS ----------
-@app.route("/workouts/<client_name>", methods=["GET"])
+@app.route("/workouts/<string:client_name>", methods=["GET"])
 def get_workouts(client_name):
     conn = get_db()
     workouts = conn.execute(
-        "SELECT * FROM workouts WHERE client_name=? ORDER BY date DESC", (client_name,)
+        "SELECT * FROM workouts WHERE client_name=? ORDER BY date DESC",
+        (client_name,)
     ).fetchall()
     conn.close()
     return jsonify([dict(w) for w in workouts]), 200
@@ -167,7 +179,8 @@ def add_workout():
 
     conn = get_db()
     conn.execute(
-        "INSERT INTO workouts (client_name, date, workout_type, duration_min, notes) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO workouts (client_name, date, workout_type, duration_min, notes)"
+        " VALUES (?, ?, ?, ?, ?)",
         (
             data["client_name"],
             data.get("date", date.today().isoformat()),
@@ -182,11 +195,12 @@ def add_workout():
 
 
 # ---------- PROGRESS ----------
-@app.route("/progress/<client_name>", methods=["GET"])
+@app.route("/progress/<string:client_name>", methods=["GET"])
 def get_progress(client_name):
     conn = get_db()
     progress = conn.execute(
-        "SELECT * FROM progress WHERE client_name=? ORDER BY id", (client_name,)
+        "SELECT * FROM progress WHERE client_name=? ORDER BY id",
+        (client_name,)
     ).fetchall()
     conn.close()
     return jsonify([dict(p) for p in progress]), 200
@@ -213,11 +227,12 @@ def add_progress():
 
 
 # ---------- MEMBERSHIP ----------
-@app.route("/membership/<client_name>", methods=["GET"])
+@app.route("/membership/<string:client_name>", methods=["GET"])
 def check_membership(client_name):
     conn = get_db()
     client = conn.execute(
-        "SELECT name, membership_status FROM clients WHERE name=?", (client_name,)
+        "SELECT name, membership_status FROM clients WHERE name=?",
+        (client_name,)
     ).fetchone()
     conn.close()
     if not client:
@@ -238,7 +253,9 @@ def generate_program():
     data = request.get_json()
     goal = data.get("goal", "Beginner") if data else "Beginner"
     if goal not in PROGRAM_TEMPLATES:
-        return jsonify({"error": f"Unknown goal. Choose from: {list(PROGRAM_TEMPLATES.keys())}"}), 400
+        return jsonify({
+            "error": f"Unknown goal. Choose from: {list(PROGRAM_TEMPLATES.keys())}"
+        }), 400
 
     programs = PROGRAM_TEMPLATES[goal]
     return jsonify({

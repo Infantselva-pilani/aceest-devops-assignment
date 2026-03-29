@@ -1,216 +1,244 @@
-# ACEest Fitness & Gym — CI/CD Pipeline
+# ACEest Fitness & Gym — Automated CI/CD Pipeline
 
-> **DevOps Assignment 1** | BITS Pilani | Course: Introduction to DevOps (CSIZG514/SEZG514)
+**Infant Selva | 2024TM93572**
+Introduction to DevOps — CSIZG514/SEZG514/SEUSZG514 | BITS Pilani WILP
 
-A Flask-based REST API for the ACEest Fitness & Gym management system, demonstrating a complete CI/CD pipeline using **Git**, **Docker**, **GitHub Actions**, and **Jenkins**.
+---
+
+## What I Built and Why
+
+For this assignment, I was given the role of a Junior DevOps Engineer for **ACEest Fitness & Gym**, a scaling startup that needed a proper automated deployment workflow. The existing codebase was a desktop application built with tkinter — it had no API, no tests, and no way to deploy it consistently across environments.
+
+My goal was to modernise this into a **Flask REST API**, wrap it in Docker, and build a complete CI/CD pipeline using **GitHub Actions** and **Jenkins** — so that every time I push code, it automatically gets linted, tested, and containerised without any manual steps.
 
 ---
 
 ## Table of Contents
 
 1. [Project Structure](#project-structure)
-2. [Local Setup & Execution](#local-setup--execution)
-3. [Running Tests Manually](#running-tests-manually)
-4. [Docker Usage](#docker-usage)
+2. [How I Set It Up Locally](#how-i-set-it-up-locally)
+3. [Running the Tests](#running-the-tests)
+4. [Docker](#docker)
 5. [GitHub Actions Pipeline](#github-actions-pipeline)
-6. [Jenkins Integration](#jenkins-integration)
-7. [API Endpoints](#api-endpoints)
+6. [Jenkins Setup](#jenkins-setup)
+7. [API Reference](#api-reference)
+8. [My Git Branching Approach](#my-git-branching-approach)
 
 ---
 
 ## Project Structure
 
 ```
-aceest-fitness/
-├── app.py                        # Flask application (REST API)
-├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Multi-stage Docker build
-├── Jenkinsfile                   # Jenkins declarative pipeline
+aceest-devops-assignment/
+├── app.py                        # My Flask REST API — the core application
+├── requirements.txt              # Python packages I used
+├── Dockerfile                    # How I containerised the app
+├── Jenkinsfile                   # Jenkins pipeline I configured
 ├── .github/
 │   └── workflows/
-│       └── main.yml              # GitHub Actions CI/CD pipeline
+│       └── main.yml              # GitHub Actions — auto-runs on every push
 ├── tests/
-│   └── test_app.py               # Pytest test suite
-└── README.md
+│   └── test_app.py               # 30 unit tests I wrote using Pytest
+└── README.md                     # This file
 ```
 
 ---
 
-## Local Setup & Execution
+## How I Set It Up Locally
 
-### Prerequisites
-- Python 3.11+
-- pip
-- Docker (for containerized execution)
+Before setting up any pipeline, I made sure the application runs cleanly on a local machine. Here are the steps I followed:
 
-### Steps
+**Prerequisites:** Python 3.11+, pip, Git, Docker
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/<your-username>/aceest-fitness.git
-cd aceest-fitness
+# Clone the repository
+git clone https://github.com/Infantselva-pilani/aceest-devops-assignment.git
+cd aceest-devops-assignment
 
-# 2. Create a virtual environment
+# Create and activate a virtual environment
 python3 -m venv venv
 source venv/bin/activate        # Linux/macOS
 # venv\Scripts\activate         # Windows
 
-# 3. Install dependencies
+# Install all dependencies
 pip install -r requirements.txt
 
-# 4. Run the application
+# Start the Flask server
 python app.py
 ```
 
-The API will be available at `http://localhost:5000`.
-
----
-
-## Running Tests Manually
+Once running, the API is available at `http://localhost:5000`. I can hit the `/health` endpoint to confirm it's live:
 
 ```bash
-# Run all tests with verbose output
-pytest tests/ -v
-
-# Run with coverage report
-pytest tests/ -v --cov=app --cov-report=term-missing
-
-# Run a specific test class
-pytest tests/test_app.py::TestClients -v
+curl http://localhost:5000/health
+# {"service": "ACEest Fitness API", "status": "healthy"}
 ```
 
 ---
 
-## Docker Usage
+## Running the Tests
+
+I wrote 30 unit tests using **Pytest** covering every endpoint — happy paths, error cases, duplicate handling, and validation. I structured them into classes so it's easy to see which feature each test belongs to.
 
 ```bash
-# Build the Docker image
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage to see which lines are covered
+pytest tests/ -v --cov=app --cov-report=term-missing
+
+# Run just one class, for example only client tests
+pytest tests/test_app.py::TestClients -v
+```
+
+All 30 tests pass locally. The same test suite is also executed inside the Docker container as part of the GitHub Actions pipeline.
+
+---
+
+## Docker
+
+I containerised the application using a **multi-stage Dockerfile**. The first stage installs dependencies and the second stage copies only what's needed, keeping the final image lean. I also added a non-root user for basic security hygiene.
+
+```bash
+# Build the image
 docker build -t aceest-fitness:latest .
 
 # Run the container
 docker run -d -p 5000:5000 --name aceest aceest-fitness:latest
 
-# Check health
+# Verify it's healthy
 curl http://localhost:5000/health
 
-# Run tests inside the container
+# Run tests inside the container (same as the pipeline does)
 docker run --rm -v $(pwd)/tests:/app/tests aceest-fitness:latest python -m pytest tests/ -v
 
-# Stop and remove the container
+# Clean up
 docker stop aceest && docker rm aceest
 ```
+
+I verified that the container starts, passes the health check, and runs all tests successfully before wiring it into the pipeline.
 
 ---
 
 ## GitHub Actions Pipeline
 
-The pipeline is defined in `.github/workflows/main.yml` and is triggered on every **push** to `main`/`develop` and every **pull request** to `main`.
+I set up the pipeline in `.github/workflows/main.yml`. It triggers automatically on every **push** to `main` or `devops-assignment-1`, and on every **pull request** to `main`. This means I never have to manually run tests — they just happen.
 
-### Pipeline Stages
+The pipeline has three sequential stages:
 
-| Stage | Description |
+| Stage | What it does |
 |---|---|
-| **Build & Lint** | Installs dependencies and runs `flake8` to catch syntax errors |
-| **Run Pytest Suite** | Executes all unit tests and generates a coverage report |
-| **Docker Image Assembly** | Builds the Docker image and validates it with a health-check |
+| **Build & Lint** | Installs dependencies and runs `flake8` to catch any syntax or import errors in my code |
+| **Pytest Suite** | Runs all 30 unit tests and generates a coverage report saved as an artifact |
+| **Docker Build** | Builds the Docker image, starts a container, hits `/health`, then runs Pytest inside the container |
 
-### Workflow Diagram
+Each stage only runs if the previous one passed — so a lint failure stops everything early without wasting time building Docker.
 
 ```
-Push / PR
-    │
-    ▼
-┌─────────────────┐
-│  Build & Lint   │  ← flake8 syntax check
-└────────┬────────┘
-         │
+Push / PR to main
+       │
+       ▼
+┌──────────────────┐
+│  Build & Lint    │  ← pip install + flake8
+└────────┬─────────┘
+         │ pass
          ▼
-┌─────────────────┐
-│  Pytest Suite   │  ← unit tests + coverage
-└────────┬────────┘
-         │
+┌──────────────────┐
+│  Pytest Suite    │  ← 30 tests + coverage report
+└────────┬─────────┘
+         │ pass
          ▼
-┌─────────────────┐
-│  Docker Build   │  ← docker build + health check
-└─────────────────┘
+┌──────────────────┐
+│  Docker Build    │  ← build image + health check + pytest in container
+└──────────────────┘
 ```
 
 ---
 
-## Jenkins Integration
+## Jenkins Setup
 
-Jenkins handles the primary **BUILD** phase, serving as a secondary quality gate.
+Jenkins handles the **BUILD** phase as a secondary quality gate — independent of GitHub Actions. I configured a declarative pipeline using the `Jenkinsfile` at the root of the repo.
 
-### Setup Steps
+### Steps I followed to set it up
 
-1. **Install Jenkins** — follow the [official guide](https://www.jenkins.io/doc/book/installing/)
-2. **Install plugins**: Git, Pipeline, Docker Pipeline, JUnit
-3. **Create a new Pipeline job**:
-   - Source: *Pipeline script from SCM*
-   - SCM: *Git* → enter your GitHub repository URL
+1. **Installed Jenkins** on a local machine using the [official guide](https://www.jenkins.io/doc/book/installing/)
+2. **Installed plugins**: Git, Pipeline, Docker Pipeline, JUnit
+3. **Created a new Pipeline job**:
+   - Set source to: *Pipeline script from SCM*
+   - SCM: Git → pointed to this GitHub repo URL
    - Script Path: `Jenkinsfile`
-4. **Configure GitHub Webhook** to trigger builds on push:
-   - Go to GitHub → Repo Settings → Webhooks
-   - Payload URL: `http://<jenkins-server>/github-webhook/`
+4. **Added a GitHub Webhook** so Jenkins triggers on every push:
+   - GitHub → Repo Settings → Webhooks → Add webhook
+   - Payload URL: `http://<my-jenkins-server>/github-webhook/`
    - Content type: `application/json`
-   - Events: *Just the push event*
+   - Trigger: *Just the push event*
 
-### Jenkins Pipeline Stages
+### What the Jenkins pipeline does
 
 ```
-Checkout → Setup Python → Lint → Unit Tests → Docker Build → Docker Test → Cleanup
+Checkout → Setup Python venv → Lint → Unit Tests → Docker Build → Docker Health Check → Cleanup
 ```
 
-The **JUnit** plugin automatically parses `test-results.xml` and displays test pass/fail history over time in the Jenkins UI.
+The JUnit plugin reads `test-results.xml` after every build and shows a pass/fail trend over time in the Jenkins dashboard — useful for catching regressions.
 
 ---
 
-## API Endpoints
+## API Reference
 
-| Method | Endpoint | Description |
+These are all the endpoints I implemented in `app.py`:
+
+| Method | Endpoint | What it does |
 |---|---|---|
-| GET | `/health` | Service health check |
-| GET | `/clients` | List all clients |
-| POST | `/clients` | Add a new client |
-| GET | `/clients/<name>` | Get a specific client |
-| PUT | `/clients/<name>` | Update client details |
-| DELETE | `/clients/<name>` | Delete a client |
-| GET | `/workouts/<client_name>` | Get workouts for a client |
-| POST | `/workouts` | Log a new workout |
-| GET | `/progress/<client_name>` | Get progress records |
-| POST | `/progress` | Log a progress entry |
-| GET | `/membership/<client_name>` | Check membership status |
-| POST | `/generate-program` | Generate a fitness program |
+| GET | `/health` | Confirms the service is running |
+| GET | `/clients` | Returns all gym clients |
+| POST | `/clients` | Registers a new client |
+| GET | `/clients/<name>` | Fetches a specific client's details |
+| PUT | `/clients/<name>` | Updates a client's info |
+| DELETE | `/clients/<name>` | Removes a client |
+| GET | `/workouts/<client_name>` | Gets all workouts logged for a client |
+| POST | `/workouts` | Logs a new workout session |
+| GET | `/progress/<client_name>` | Gets weekly adherence records |
+| POST | `/progress` | Logs a weekly adherence entry |
+| GET | `/membership/<client_name>` | Checks membership status |
+| POST | `/generate-program` | Suggests a fitness program based on goal |
 
-### Example: Add a Client
+### Quick examples
 
 ```bash
+# Add a new client
 curl -X POST http://localhost:5000/clients \
   -H "Content-Type: application/json" \
-  -d '{"name": "Alice Johnson", "age": 28, "weight": 65.0, "goal": "Fat Loss"}'
-```
+  -d '{"name": "Ravi Kumar", "age": 27, "weight": 72.0, "program": "Muscle Gain"}'
 
-### Example: Generate a Program
+# Log a workout
+curl -X POST http://localhost:5000/workouts \
+  -H "Content-Type: application/json" \
+  -d '{"client_name": "Ravi Kumar", "workout_type": "Strength", "duration_min": 60}'
 
-```bash
+# Generate a program recommendation
 curl -X POST http://localhost:5000/generate-program \
   -H "Content-Type: application/json" \
-  -d '{"goal": "Muscle Gain"}'
+  -d '{"goal": "Fat Loss"}'
 ```
 
 ---
 
-## Git Branching Strategy
+## My Git Branching Approach
+
+I kept `master` as the stable branch with the original code and created `devops-assignment-1` for all my assignment work. This mirrors how feature branches work in real teams — you never commit directly to main.
 
 ```
-main        ← production-ready code, protected branch
-  └── develop ← integration branch
-        ├── feature/flask-api
-        ├── feature/docker-setup
-        └── feature/ci-cd-pipeline
+master                  ← original code, untouched
+  └── devops-assignment-1  ← all my assignment work (this branch)
 ```
+
+Within my work I made commits that map to logical steps:
+- Initial Flask API structure
+- Added unit tests
+- Dockerfile and containerisation
+- GitHub Actions workflow
+- Jenkins pipeline configuration
 
 ---
 
-*Built for BITS Pilani DevOps Assignment 1 | Prof. A R Rahman*
-*Student Roll No: 2024TM93572*
+*Infant Selva | 2024TM93572 | BITS Pilani WILP*
