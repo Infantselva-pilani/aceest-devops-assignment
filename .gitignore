@@ -1,14 +1,38 @@
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+
+# Database
 *.db
+*.sqlite3
+
+# Virtual environment
 venv/
+env/
+.venv/
+
+# Environment variables
 .env
-*.egg-info/
-dist/
-build/
+.env.*
+
+# Testing & coverage
 .pytest_cache/
 .coverage
 coverage.xml
 htmlcov/
 test-results.xml
+*.xml
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Logs
 *.log
+
+# OS
+.DS_Store
+Thumbs.db
