@@ -2,7 +2,7 @@ name: ACEest Fitness CI/CD Pipeline
 
 on:
   push:
-    branches: [ "master", "devops-assignment-1" ]
+    branches: [ "master", "devops-assignment-2" ]
   pull_request:
     branches: [ "master" ]
 
