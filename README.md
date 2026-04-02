@@ -229,7 +229,8 @@ I kept `master` as the stable branch with the original code and created `devops-
 
 ```
 master                  ← original code, untouched
-  └── devops-assignment-1  ← all my assignment work (this branch)
+  └── devops-assignment-2  ← all my assignment work (this branch)
+           └── test_devops-assignment-2  ← feature branch
 ```
 
 Within my work I made commits that map to logical steps:
