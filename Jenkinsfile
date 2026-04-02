@@ -67,14 +67,18 @@ pipeline {
             steps {
                 echo "========== STAGE 6: Deploy =========="
                 bat '''
+                REM Stop and remove old container
                 docker stop %CONTAINER_NAME% 2>nul
                 docker rm %CONTAINER_NAME% 2>nul
 
+                REM Run new container
                 docker run -d -p 5000:5000 --name %CONTAINER_NAME% %IMAGE_NAME%:latest
 
-                timeout /t 10
+                REM Wait (Windows safe delay)
+                ping 127.0.0.1 -n 15 > nul
 
-                curl --fail http://localhost:5000/health
+                REM Retry health check until app is ready
+                curl --retry 5 --retry-delay 3 --fail http://localhost:5000/health
                 '''
             }
         }
