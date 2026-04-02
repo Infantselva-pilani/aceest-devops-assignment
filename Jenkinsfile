@@ -13,7 +13,6 @@ pipeline {
             steps {
                 echo "========== STAGE 1: Checkout =========="
                 checkout scm
-                echo "Source code checked out successfully."
             }
         }
 
@@ -23,10 +22,9 @@ pipeline {
                 bat '''
                 py -m venv venv
                 call venv\\Scripts\\activate.bat
-                pip install --upgrade pip
+                python -m pip install --upgrade pip
                 pip install -r requirements.txt
                 '''
-                echo "Python environment ready."
             }
         }
 
@@ -35,9 +33,8 @@ pipeline {
                 echo "========== STAGE 3: Lint =========="
                 bat '''
                 call venv\\Scripts\\activate.bat
-                flake8 . || exit /b 0
+                flake8 . --exclude=venv,__pycache__ || exit /b 0
                 '''
-                echo "Lint check completed."
             }
         }
 
@@ -48,7 +45,6 @@ pipeline {
                 call venv\\Scripts\\activate.bat
                 pytest --junitxml=test-results.xml --cov=. --cov-report=xml
                 '''
-                echo "All unit tests passed."
             }
             post {
                 always {
@@ -64,7 +60,6 @@ pipeline {
                 docker build -t %IMAGE_NAME%:%IMAGE_TAG% .
                 docker tag %IMAGE_NAME%:%IMAGE_TAG% %IMAGE_NAME%:latest
                 '''
-                echo "Docker image built successfully."
             }
         }
 
@@ -72,20 +67,15 @@ pipeline {
             steps {
                 echo "========== STAGE 6: Deploy =========="
                 bat '''
-                REM Stop and remove old container (ignore errors)
                 docker stop %CONTAINER_NAME% 2>nul
                 docker rm %CONTAINER_NAME% 2>nul
 
-                REM Run new container
                 docker run -d -p 5000:5000 --name %CONTAINER_NAME% %IMAGE_NAME%:latest
 
-                REM Wait for app to start
                 timeout /t 10
 
-                REM Health check
                 curl --fail http://localhost:5000/health
                 '''
-                echo "Deployment successful."
             }
         }
 
@@ -107,7 +97,7 @@ pipeline {
             echo "BUILD SUCCESS"
         }
         failure {
-            echo "BUILD FAILED - Check logs"
+            echo "BUILD FAILED"
             bat 'docker stop %CONTAINER_NAME% 2>nul'
         }
     }
