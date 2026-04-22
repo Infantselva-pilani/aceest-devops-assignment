@@ -1,0 +1,121 @@
+# Shadow Deployment Strategy
+# Production traffic goes to stable. All requests are ALSO mirrored to shadow.
+# Shadow processes requests but responses are discarded — real users unaffected.
+# Used to test new version with real production traffic before releasing it.
+#
+# HOW TO USE:
+#   kubectl apply -f k8s/deployment-shadow.yaml
+#   Check shadow logs: kubectl logs -l version=shadow
+#   Compare response times: kubectl top pods
+#   Promote shadow when confident: update stable image, remove shadow
+#
+# Author: Infant Selva | 2024TM93572
+
+# ── Production (stable) deployment ────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-production
+  labels:
+    app: aceest-fitness
+    version: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: production
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: production
+    spec:
+      containers:
+        - name: aceest-fitness
+          image: selva015/aceest-fitness:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+# ── Shadow deployment (mirrors traffic — responses discarded) ──────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-shadow
+  labels:
+    app: aceest-fitness
+    version: shadow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: shadow
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: shadow
+    spec:
+      containers:
+        - name: aceest-fitness
+          image: selva015/aceest-fitness:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+# ── Production service (real user traffic) ────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-fitness-prod-service
+spec:
+  selector:
+    app: aceest-fitness
+    version: production
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30083
+---
+# ── Shadow service (for mirrored traffic — internal only) ─────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-fitness-shadow-service
+spec:
+  selector:
+    app: aceest-fitness
+    version: shadow
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000

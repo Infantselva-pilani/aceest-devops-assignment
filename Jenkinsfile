@@ -2,10 +2,17 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME     = "aceest-fitness"
-        IMAGE_TAG      = "${env.BUILD_NUMBER}"
-        CONTAINER_NAME = "aceest-fitness-app"
-        APP_PORT       = "5000"
+        IMAGE_NAME      = "aceest-fitness"
+        DOCKERHUB_USER  = "selva015"
+        DOCKERHUB_IMAGE = "${DOCKERHUB_USER}/${IMAGE_NAME}"
+        IMAGE_TAG       = "${env.BUILD_NUMBER}"
+        CONTAINER_NAME  = "aceest-fitness-app"
+        APP_PORT        = "5000"
+        SONAR_HOST      = "http://localhost:9000"
+    }
+
+    triggers {
+        pollSCM('H/2 * * * *')
     }
 
     stages {
@@ -58,34 +65,72 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                echo "========== STAGE 5: SonarQube Analysis =========="
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    bat """
+                        call venv\\Scripts\\activate.bat
+                        sonar-scanner ^
+                          -Dsonar.projectKey=aceest-fitness ^
+                          -Dsonar.sources=. ^
+                          -Dsonar.exclusions=venv/**,tests/**,**/__pycache__/** ^
+                          -Dsonar.python.coverage.reportPaths=coverage.xml ^
+                          -Dsonar.host.url=${SONAR_HOST} ^
+                          -Dsonar.token=%SONAR_TOKEN%
+                        echo SonarQube analysis complete.
+                    """
+                }
+            }
+        }
+
         stage('Docker Build') {
             steps {
-                echo "========== STAGE 5: Docker Build =========="
+                echo "========== STAGE 6: Docker Build =========="
                 bat """
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                    echo Docker image built: ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker build -t ${DOCKERHUB_IMAGE}:${IMAGE_TAG} .
+                    docker tag ${DOCKERHUB_IMAGE}:${IMAGE_TAG} ${DOCKERHUB_IMAGE}:latest
+                    echo Docker image built: ${DOCKERHUB_IMAGE}:${IMAGE_TAG}
                 """
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo "========== STAGE 7: Push to Docker Hub =========="
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_TOKEN'
+                )]) {
+                    bat """
+                        echo %DOCKER_TOKEN% | docker login -u %DOCKER_USER% --password-stdin
+                        docker push ${DOCKERHUB_IMAGE}:${IMAGE_TAG}
+                        docker push ${DOCKERHUB_IMAGE}:latest
+                        echo Pushed to Docker Hub successfully.
+                        docker logout
+                    """
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                echo "========== STAGE 6: Deploy =========="
+                echo "========== STAGE 8: Deploy =========="
                 bat """
                     docker stop ${CONTAINER_NAME} 2>nul
                     docker rm   ${CONTAINER_NAME} 2>nul
-                    docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:5000 --restart unless-stopped ${IMAGE_NAME}:latest
+                    docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:5000 --restart unless-stopped ${DOCKERHUB_IMAGE}:latest
                     ping 127.0.0.1 -n 10 > nul
                     curl --retry 5 --retry-delay 3 --fail http://localhost:${APP_PORT}/health
-                    echo Health check PASSED - App is live at http://localhost:${APP_PORT}
+                    echo Health check PASSED
                 """
             }
         }
 
         stage('Smoke Test') {
             steps {
-                echo "========== STAGE 7: Smoke Test =========="
+                echo "========== STAGE 9: Smoke Test =========="
                 bat """
                     curl --fail http://localhost:${APP_PORT}/health
                     curl --fail http://localhost:${APP_PORT}/clients
@@ -97,11 +142,9 @@ pipeline {
 
     post {
         success {
-            echo "=========================================="
             echo "BUILD AND DEPLOY SUCCESSFUL"
+            echo "Image pushed: ${DOCKERHUB_IMAGE}:${IMAGE_TAG}"
             echo "App running at http://localhost:${APP_PORT}"
-            echo "Build #${env.BUILD_NUMBER} completed."
-            echo "=========================================="
         }
         failure {
             echo "BUILD FAILED - check logs above."

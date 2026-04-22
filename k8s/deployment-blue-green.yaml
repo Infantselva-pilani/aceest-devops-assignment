@@ -1,0 +1,107 @@
+# Blue-Green Deployment Strategy
+# Two identical environments (blue=current, green=new)
+# Switch traffic instantly by updating the Service selector
+#
+# HOW TO USE:
+#   Deploy both:  kubectl apply -f k8s/deployment-blue-green.yaml
+#   Switch to green (after testing):
+#     kubectl patch service aceest-fitness-bg-service -p '{"spec":{"selector":{"version":"green"}}}'
+#   Rollback to blue:
+#     kubectl patch service aceest-fitness-bg-service -p '{"spec":{"selector":{"version":"blue"}}}'
+#
+# Author: Infant Selva | 2024TM93572
+
+# ── BLUE deployment (current stable version) ──────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-blue
+  labels:
+    app: aceest-fitness
+    version: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: blue
+    spec:
+      containers:
+        - name: aceest-fitness
+          image: selva015/aceest-fitness:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+# ── GREEN deployment (new version being tested) ───────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-green
+  labels:
+    app: aceest-fitness
+    version: green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: green
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: green
+    spec:
+      containers:
+        - name: aceest-fitness
+          # Point to new version image tag when deploying green
+          image: selva015/aceest-fitness:latest
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+# ── Service (points to BLUE by default — switch selector to green) ─────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-fitness-bg-service
+spec:
+  selector:
+    app: aceest-fitness
+    version: blue        # Change to "green" to switch live traffic
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30081
