@@ -1,0 +1,174 @@
+# A/B Testing Deployment Strategy
+# Route different user groups to different versions based on HTTP headers.
+# Version A = control group, Version B = experimental group.
+# Requires an Ingress controller (NGINX) to split by header.
+#
+# HOW TO USE:
+#   # Enable ingress on Minikube first:
+#   minikube addons enable ingress
+#
+#   # Deploy:
+#   kubectl apply -f k8s/deployment-ab-testing.yaml
+#
+#   # Test version A (default):
+#   curl http://$(minikube ip)/health
+#
+#   # Test version B (send header):
+#   curl -H "X-Version: B" http://$(minikube ip)/health
+#
+#   # Check which version pod handled the request:
+#   kubectl logs -l version=b --tail=5
+#
+# Author: Infant Selva | 2024TM93572
+
+# ── Version A — control group (stable version) ────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-version-a
+  labels:
+    app: aceest-fitness
+    version: a
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: a
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: a
+    spec:
+      containers:
+        - name: aceest-fitness
+          image: selva015/aceest-fitness:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VERSION
+              value: "A"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+# ── Version B — experimental group (new version) ──────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-version-b
+  labels:
+    app: aceest-fitness
+    version: b
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aceest-fitness
+      version: b
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness
+        version: b
+    spec:
+      containers:
+        - name: aceest-fitness
+          image: selva015/aceest-fitness:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_VERSION
+              value: "B"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+# ── Service A (version A traffic) ─────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-fitness-service-a
+spec:
+  selector:
+    app: aceest-fitness
+    version: a
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+# ── Service B (version B traffic) ─────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: aceest-fitness-service-b
+spec:
+  selector:
+    app: aceest-fitness
+    version: b
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+# ── Ingress — routes by header X-Version ──────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aceest-fitness-ab-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # Route requests with header X-Version: B to version B service
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Version"
+    nginx.ingress.kubernetes.io/canary-by-header-value: "B"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aceest-fitness-service-b
+                port:
+                  number: 80
+---
+# Default ingress (version A — all traffic without special header)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aceest-fitness-default-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aceest-fitness-service-a
+                port:
+                  number: 80
