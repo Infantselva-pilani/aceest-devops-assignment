@@ -1,149 +1,124 @@
 # Kubernetes Deployment Strategies — ACEest Fitness & Gym
 
+**Author:** Infant Selva | 2024TM93572
+
 This folder contains YAML manifests for 5 deployment strategies using Minikube.
+
+---
 
 ## Prerequisites
 
-```bash
-# Start Minikube
+```cmd
 minikube start
-
-# Verify it's running
 minikube status
-kubectl get nodes
 ```
 
 ---
 
-## Strategy 1 — Rolling Update (default)
+## Strategy 1 — Rolling Update
 
 Replaces pods gradually. Zero downtime. Kubernetes does this automatically.
 
-```bash
-kubectl apply -f deployment-rolling.yaml
+```cmd
+kubectl apply -f k8s/deployment-rolling.yaml
 kubectl rollout status deployment/aceest-fitness-rolling
+```
 
-# Access the app
-minikube service aceest-fitness-service --url
+### Accessing the app (3 ways — use whichever works)
 
-# Update to new image (triggers rolling update automatically)
-kubectl set image deployment/aceest-fitness-rolling aceest-fitness=selva015/aceest-fitness:2
+**Method A — Port forward (MOST RELIABLE on Windows):**
+```cmd
+kubectl port-forward service/aceest-fitness-service 8080:80
+```
+Keep this window open. In a new CMD:
+```cmd
+curl http://localhost:8080/health
+```
 
-# Rollback if needed
-kubectl rollout undo deployment/aceest-fitness-rolling
+**Method B — Minikube service URL:**
+```cmd
+minikube service aceest-fitness-service
+```
+Keep this window open. It will tunnel and auto-open browser.
+
+**Method C — Inside the pod (always works):**
+```cmd
+kubectl get pods
+kubectl exec -it <pod-name> -- curl http://localhost:5000/health
 ```
 
 ---
 
 ## Strategy 2 — Blue-Green
 
-Two full environments. Switch traffic instantly by changing service selector.
+```cmd
+kubectl apply -f k8s/deployment-blue-green.yaml
+kubectl port-forward service/aceest-fitness-bg-service 8081:80
+# In another CMD:
+curl http://localhost:8081/health
 
-```bash
-kubectl apply -f deployment-blue-green.yaml
+# Switch to GREEN version
+kubectl patch service aceest-fitness-bg-service -p "{\"spec\":{\"selector\":{\"version\":\"green\"}}}"
 
-# Traffic goes to BLUE by default
-minikube service aceest-fitness-bg-service --url
-
-# Switch to GREEN (after verifying green is healthy)
-kubectl patch service aceest-fitness-bg-service \
-  -p '{"spec":{"selector":{"version":"green"}}}'
-
-# Rollback to BLUE instantly
-kubectl patch service aceest-fitness-bg-service \
-  -p '{"spec":{"selector":{"version":"blue"}}}'
+# Rollback to BLUE
+kubectl patch service aceest-fitness-bg-service -p "{\"spec\":{\"selector\":{\"version\":\"blue\"}}}"
 ```
 
 ---
 
 ## Strategy 3 — Canary
 
-25% traffic goes to new version. Monitor it. Promote or rollback.
+```cmd
+kubectl apply -f k8s/deployment-canary.yaml
+kubectl port-forward service/aceest-fitness-canary-service 8082:80
+# Traffic auto-distributed: 75% stable, 25% canary
 
-```bash
-kubectl apply -f deployment-canary.yaml
-
-# Access app (Kubernetes load-balances ~25% to canary automatically)
-minikube service aceest-fitness-canary-service --url
-
-# Monitor canary behaviour
-kubectl logs -l version=canary -f
-
-# Promote canary (scale stable down, canary up)
+# Promote canary
 kubectl scale deployment aceest-fitness-canary --replicas=3
 kubectl scale deployment aceest-fitness-stable --replicas=0
-
-# Rollback canary
-kubectl scale deployment aceest-fitness-canary --replicas=0
 ```
 
 ---
 
 ## Strategy 4 — Shadow
 
-Real traffic goes to production. Identical traffic is ALSO sent to shadow silently.
-Shadow responses are discarded. Used to test new version with real data.
-
-```bash
-kubectl apply -f deployment-shadow.yaml
-
-# Production traffic (real users)
-minikube service aceest-fitness-prod-service --url
-
-# Check shadow logs (no user impact)
+```cmd
+kubectl apply -f k8s/deployment-shadow.yaml
+kubectl port-forward service/aceest-fitness-prod-service 8083:80
+# Check shadow logs:
 kubectl logs -l version=shadow -f
-
-# Compare metrics
-kubectl top pods
 ```
 
 ---
 
 ## Strategy 5 — A/B Testing
 
-Different versions served to different user groups via HTTP header.
-
-```bash
-# Enable ingress first
+```cmd
 minikube addons enable ingress
+kubectl apply -f k8s/deployment-ab-testing.yaml
 
-kubectl apply -f deployment-ab-testing.yaml
+# Default goes to Version A
+curl http://%MINIKUBE_IP%/health
 
-# Get the Minikube IP
-minikube ip
-
-# Test version A (default — no special header)
-curl http://$(minikube ip)/health
-
-# Test version B (send header to route to version B)
-curl -H "X-Version: B" http://$(minikube ip)/health
-
-# Check which version handled requests
-kubectl logs -l version=a --tail=10
-kubectl logs -l version=b --tail=10
+# Header sends to Version B
+curl -H "X-Version: B" http://%MINIKUBE_IP%/health
 ```
 
 ---
 
-## Useful Commands
+## Useful commands
 
-```bash
-# View all deployments
+```cmd
 kubectl get deployments
-
-# View all pods
 kubectl get pods
-
-# View all services
 kubectl get services
 
-# Delete everything (cleanup)
-kubectl delete -f deployment-rolling.yaml
-kubectl delete -f deployment-blue-green.yaml
-kubectl delete -f deployment-canary.yaml
-kubectl delete -f deployment-shadow.yaml
-kubectl delete -f deployment-ab-testing.yaml
+# Delete everything
+kubectl delete -f k8s/deployment-rolling.yaml
+kubectl delete -f k8s/deployment-blue-green.yaml
+kubectl delete -f k8s/deployment-canary.yaml
+kubectl delete -f k8s/deployment-shadow.yaml
+kubectl delete -f k8s/deployment-ab-testing.yaml
 
-# Stop Minikube
 minikube stop
 ```
