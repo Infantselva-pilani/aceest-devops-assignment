@@ -2,28 +2,22 @@ name: ACEest Fitness CI/CD Pipeline
 
 on:
   push:
-    branches: [ "master", "devops-assignment-2" ]
+    branches: [ "master", "devops-assignment-1", "test_devops-assignment-2" ]
   pull_request:
     branches: [ "master" ]
 
 jobs:
 
-  # ─────────────────────────────────────────
-  # Stage 1: Build & Lint
-  # ─────────────────────────────────────────
   build-and-lint:
     name: Build & Lint
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Cache pip dependencies
         uses: actions/cache@v4
         with:
@@ -31,76 +25,58 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Lint with flake8
         run: |
           flake8 app.py --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 app.py --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
-  # ─────────────────────────────────────────
-  # Stage 2: Run Tests
-  # ─────────────────────────────────────────
   test:
     name: Run Pytest Suite
     runs-on: ubuntu-latest
     needs: build-and-lint
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
       - name: Run Tests with Coverage
         run: |
           pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
-
       - name: Upload Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
 
-  # ─────────────────────────────────────────
-  # Stage 3: Docker Image Assembly
-  # ─────────────────────────────────────────
   docker-build:
     name: Docker Image Assembly
     runs-on: ubuntu-latest
     needs: test
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Build Docker Image
         run: |
           docker build -t aceest-fitness:${{ github.sha }} .
           docker build -t aceest-fitness:latest .
-
       - name: Test Docker Container
         run: |
           docker run -d --name aceest-test -p 5000:5000 aceest-fitness:latest
           sleep 5
           curl --fail http://localhost:5000/health || (docker logs aceest-test && exit 1)
           docker stop aceest-test
-
       - name: Run Pytest inside Docker
         run: |
           docker run --rm \
