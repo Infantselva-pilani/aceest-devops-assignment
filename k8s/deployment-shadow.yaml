@@ -103,7 +103,7 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 5000
-      nodePort: 30083
+      nodePort: 30084
 ---
 # ── Shadow service (for mirrored traffic — internal only) ─────────────────
 apiVersion: v1
