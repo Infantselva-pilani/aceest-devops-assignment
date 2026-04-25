@@ -51,7 +51,7 @@ aceest-devops-assignment/
 
 | Branch | Purpose |
 |---|---|
-| `test_devops-assignment-2` | Development — all assignment work done here |
+| `devops-assignment-2` | Development — all assignment work done here |
 | `master` | Submission — final merge from development branch |
 
 All development is done in the feature branch. Once tested and verified, changes are merged into `master` for submission — mirroring industry branch management practices.
